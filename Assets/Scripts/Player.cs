@@ -1,97 +1,206 @@
+ï»¿using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class Player : MonoBehaviour
 {
-    public float moveSpeed = 5f; // Íæ¼ÒÒÆ¶¯ËÙ¶È
-    public float jumpForce = 10f; // ÌøÔ¾Á¦Á¿
-    public GameObject bulletPrefab; // ×Óµ¯Ô¤ÖÆÌå
-    public Transform firePoint; // ·¢Éäµã
-    public float bulletSpeed = 10f; // ×Óµ¯·ÉĞĞËÙ¶È
-    public float rotationSpeed = 5f; // Ö÷½ÇĞı×ªËÙ¶È
-    public float attackCooldown = 0.5f; // ¹¥»÷ÀäÈ´Ê±¼ä
-    public GameObject failPanel; // Ê§°ÜÃæ°å
-    public GameObject winPanel; // Ê¤ÀûÃæ°å
-    public Text remainText; // ÏÔÊ¾Ê£ÓàµĞÈËµĞÈËÊıÁ¿µÄÎÄ±¾
-    public Transform checkGround; // ¼ì²âÊÇ·ñÔÚµØÃæÉÏµÄÎ»ÖÃ
-    public Slider slider; // Íæ¼ÒÉúÃüÖµ»¬¶¯Ìõ
+    public float moveSpeed = 5f; // ç©å®¶ç§»åŠ¨é€Ÿåº¦
+    public float jumpForce = 10f; // è·³è·ƒåŠ›é‡
+    public GameObject bulletPrefab; // å­å¼¹é¢„åˆ¶ä½“
+    public Transform firePoint; // å‘å°„ç‚¹
+    public float bulletSpeed = 10f; // å­å¼¹é£è¡Œé€Ÿåº¦
+    public float rotationSpeed = 5f; // ä¸»è§’æ—‹è½¬é€Ÿåº¦
+    public float attackCooldown = 0.8f; // æ”»å‡»å†·å´æ—¶é—´
 
-    private bool isGrounded = false; // ÊÇ·ñÔÚµØÃæÉÏ
-    private float attackTimer = 0f; // ¹¥»÷ÀäÈ´¼ÆÊ±Æ÷
-    private Animator animator; // ¶¯»­¿ØÖÆÆ÷
-    private bool isEnd = false; // ÓÎÏ·½áÊø±êÖ¾
+    public GameObject failPanel; // å¤±è´¥é¢æ¿
+    public GameObject winPanel; // èƒœåˆ©é¢æ¿
+    public Text remainText; // æ˜¾ç¤ºå‰©ä½™æ•Œäººæ•°é‡çš„æ–‡æœ¬
+    public Transform checkGround; // æ£€æµ‹æ˜¯å¦åœ¨åœ°é¢ä¸Šçš„ä½ç½®
+    public Slider slider; // ç©å®¶ç”Ÿå‘½å€¼æ»‘åŠ¨æ¡
+    public GameObject boostPanel;   // å³ä¸‹è§’èƒŒæ™¯Panel
+    public Text boostText;          // å³ä¸‹è§’å€’è®¡æ—¶æ–‡å­—
+    private float boostRemaining = 0f;
+
+    private bool isGrounded = false; // æ˜¯å¦åœ¨åœ°é¢ä¸Š
+    private float attackTimer = 0f; // æ”»å‡»å†·å´è®¡æ—¶å™¨
+    private Animator animator; // åŠ¨ç”»æ§åˆ¶å™¨
+    private bool isEnd = false; // æ¸¸æˆç»“æŸæ ‡å¿—
+
+    // ====== å­å¼¹åŠ é€Ÿ Buff ç›¸å…³ ======
+    private float baseAttackCooldown;
+    private float baseBulletSpeed;
+    private Coroutine boostRoutine;
+
+    [Header("ç»“æŸéŸ³æ•ˆ")]
+    public AudioClip winSfx;
+    public float winVolume = 1f;
+    public AudioClip loseSfx;
+    public float loseVolume = 1f;
+
+    public AudioSource bgmSource; // èƒŒæ™¯éŸ³ä¹éŸ³æº
+
+
 
     private void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked; // Ëø¶¨Êó±ê¹â±ê
-        animator = GetComponent<Animator>(); // »ñÈ¡Animator×é¼ş
+        Cursor.lockState = CursorLockMode.Locked; // é”å®šé¼ æ ‡å…‰æ ‡
+        animator = GetComponent<Animator>(); // è·å–Animatorç»„ä»¶
+
+        // è®°å½•åˆå§‹å€¼ï¼ˆç”¨æ¥Buffç»“æŸåæ¢å¤ï¼‰
+        baseAttackCooldown = attackCooldown;
+        baseBulletSpeed = bulletSpeed;
     }
 
     void Update()
     {
-        if (isEnd) return; // Èç¹ûÓÎÏ·½áÊø£¬²»ÔÙ¸üĞÂ
+        if (isEnd) return; // å¦‚æœæ¸¸æˆç»“æŸï¼Œä¸å†æ›´æ–°
 
-        // »ñÈ¡Íæ¼ÒµÄË®Æ½ºÍ´¹Ö±ÊäÈë
+        // è·å–ç©å®¶çš„æ°´å¹³å’Œå‚ç›´è¾“å…¥
         float moveInput = Input.GetAxis("Horizontal");
         float verticalInput = Input.GetAxis("Vertical");
         Vector3 movement = new Vector3(moveInput, 0, verticalInput);
 
-        // Èç¹ûÓĞÒÆ¶¯ÊäÈë£¬Ôò²¥·ÅÒÆ¶¯¶¯»­²¢ÒÆ¶¯Íæ¼Ò
+        // å¦‚æœæœ‰ç§»åŠ¨è¾“å…¥ï¼Œåˆ™æ’­æ”¾ç§»åŠ¨åŠ¨ç”»å¹¶ç§»åŠ¨ç©å®¶
         if (movement != Vector3.zero)
         {
             animator.SetBool("Move", true);
-            transform.Translate(movement * moveSpeed * Time.deltaTime); // ÒÆ¶¯Íæ¼Ò
+            transform.Translate(movement * moveSpeed * Time.deltaTime); // ç§»åŠ¨ç©å®¶
         }
         else
         {
-            animator.SetBool("Move", false); // ÎŞÊäÈëÊ±Í£Ö¹ÒÆ¶¯¶¯»­
+            animator.SetBool("Move", false); // æ— è¾“å…¥æ—¶åœæ­¢ç§»åŠ¨åŠ¨ç”»
         }
 
-        // Ğı×ªÍæ¼ÒÊÓ½Ç
+        // æ—‹è½¬ç©å®¶è§†è§’
         float mouseX = Input.GetAxis("Mouse X");
-        transform.Rotate(Vector3.up * mouseX * rotationSpeed); // ¸ù¾İÊó±êË®Æ½ÒÆ¶¯Ğı×ªÍæ¼Ò
+        transform.Rotate(Vector3.up * mouseX * rotationSpeed); // æ ¹æ®é¼ æ ‡æ°´å¹³ç§»åŠ¨æ—‹è½¬ç©å®¶
 
-        // ¼ì²âÊÇ·ñÔÚµØÃæÉÏ
+        // æ£€æµ‹æ˜¯å¦åœ¨åœ°é¢ä¸Š
         isGrounded = Physics.CheckSphere(checkGround.position, 0.5f, LayerMask.GetMask("Ground"));
 
-        // °´ÏÂ¿Õ¸ñ¼üÇÒ½ÇÉ«ÔÚµØÃæÉÏÊ±ÌøÔ¾
+        // æŒ‰ä¸‹ç©ºæ ¼é”®ä¸”è§’è‰²åœ¨åœ°é¢ä¸Šæ—¶è·³è·ƒ
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
-            GetComponent<Rigidbody>().AddForce(new Vector3(0, jumpForce, 0), ForceMode.Impulse); // ÏòÉÏÊ©¼ÓÁ¦ÊµÏÖÌøÔ¾
+            GetComponent<Rigidbody>().AddForce(new Vector3(0, jumpForce, 0), ForceMode.Impulse); // å‘ä¸Šæ–½åŠ åŠ›å®ç°è·³è·ƒ
         }
 
-        // ¹¥»÷ÀäÈ´Âß¼­
-        attackTimer -= Time.deltaTime; // ÀäÈ´Ê±¼äµİ¼õ
-        if (Input.GetMouseButtonDown(0) && attackTimer <= 0f && movement == Vector3.zero) // Êó±ê×ó¼üµã»÷ÇÒÀäÈ´½áÊøÊ±¹¥»÷
+        // æ”»å‡»å†·å´é€»è¾‘
+        attackTimer -= Time.deltaTime; // å†·å´æ—¶é—´é€’å‡
+        if (Input.GetMouseButton(0) && attackTimer <= 0f) // æŒ‰ä½é¼ æ ‡å·¦é”®ä¸”å†·å´ç»“æŸæ—¶æ”»å‡»
         {
-            animator.SetTrigger("Attack"); // ²¥·Å¹¥»÷¶¯»­
-            GetComponent<AudioSource>().Play(); // ²¥·Å¹¥»÷ÒôĞ§
-            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation); // ´´½¨×Óµ¯ÊµÀı
-            Rigidbody rb = bullet.GetComponent<Rigidbody>(); // »ñÈ¡×Óµ¯¸ÕÌå
-            rb.velocity = transform.forward * bulletSpeed; // ÉèÖÃ×Óµ¯ËÙ¶È
-            Destroy(bullet, 5f); // 5ÃëºóÏú»Ù×Óµ¯
-            attackTimer = attackCooldown; // ÖØÖÃ¹¥»÷ÀäÈ´¼ÆÊ±Æ÷
+            animator.SetTrigger("Attack"); // æ’­æ”¾æ”»å‡»åŠ¨ç”»
+            GetComponent<AudioSource>().Play(); // æ’­æ”¾æ”»å‡»éŸ³æ•ˆ
+            GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation); // åˆ›å»ºå­å¼¹å®ä¾‹
+            Rigidbody rb = bullet.GetComponent<Rigidbody>(); // è·å–å­å¼¹åˆšä½“
+            rb.velocity = transform.forward * bulletSpeed; // è®¾ç½®å­å¼¹é€Ÿåº¦
+            Destroy(bullet, 5f); // 5ç§’åé”€æ¯å­å¼¹
+            attackTimer = attackCooldown; // é‡ç½®æ”»å‡»å†·å´è®¡æ—¶å™¨
         }
 
-        // ¼ì²éÊ§°ÜÌõ¼ş
-        if (transform.position.y < -5 || slider.value < 0.01f) // Èç¹ûÍæ¼ÒµôÂä»òÉúÃüÖµÎª0
+        // æ£€æŸ¥å¤±è´¥æ¡ä»¶
+        if (transform.position.y < -5 || slider.value < 0.01f) // å¦‚æœç©å®¶æ‰è½æˆ–ç”Ÿå‘½å€¼ä¸º0
         {
-            failPanel.SetActive(true); // ÏÔÊ¾Ê§°ÜÃæ°å
-            Cursor.lockState = CursorLockMode.None; // ½âËøÊó±ê
-            isEnd = true; // ÓÎÏ·½áÊø
+            failPanel.SetActive(true); // æ˜¾ç¤ºå¤±è´¥é¢æ¿
+            Cursor.lockState = CursorLockMode.None; // è§£é”é¼ æ ‡
+            if (bgmSource != null) bgmSource.Pause();
+            PlayLoseSfx2D();// âœ… æ’­æ”¾å¤±è´¥éŸ³æ•ˆ
+            isEnd = true; // æ¸¸æˆç»“æŸ
         }
 
-        // ¸üĞÂÊ£ÓàµĞÈËÊıÁ¿
+        // æ›´æ–°å‰©ä½™æ•Œäººæ•°é‡
         GameObject[] enemys = GameObject.FindGameObjectsWithTag("Enemy");
-        remainText.text = "´ıÏûÃğ£º" + enemys.Length;
+        remainText.text = "Enemyï¼š" + enemys.Length;
 
-        // ¼ì²éÊÇ·ñÊ¤Àû
-        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy"); // ²éÕÒËùÓĞµĞÈË
-        if (enemies.Length == 0) // Èç¹ûÃ»ÓĞµĞÈË
+        // æ£€æŸ¥æ˜¯å¦èƒœåˆ©
+        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy"); // æŸ¥æ‰¾æ‰€æœ‰æ•Œäºº
+        if (enemies.Length == 0) // å¦‚æœæ²¡æœ‰æ•Œäºº
         {
-            winPanel.gameObject.SetActive(true); // ÏÔÊ¾Ê¤ÀûÃæ°å
-            Cursor.lockState = CursorLockMode.None; // ½âËøÊó±ê
-            isEnd = true; // ÓÎÏ·½áÊø
+            winPanel.gameObject.SetActive(true); // æ˜¾ç¤ºèƒœåˆ©é¢æ¿
+            Cursor.lockState = CursorLockMode.None; // è§£é”é¼ æ ‡
+            PlayWinSfx2D(); // âœ… æ’­æ”¾èƒœåˆ©éŸ³æ•ˆï¼ˆåªä¼šè§¦å‘ä¸€æ¬¡ï¼‰
+            isEnd = true; // æ¸¸æˆç»“æŸ
+
         }
     }
+
+    // ====== ä¾›é“å…·è°ƒç”¨ï¼šç»™ç©å®¶ä¸´æ—¶å­å¼¹åŠ é€Ÿ ======
+    // attackCooldownMultiplierï¼š<1 æ›´å¿«ï¼ˆä¾‹å¦‚ 0.6 è¡¨ç¤ºå†·å´å˜ä¸º 60%ï¼‰
+    // bulletSpeedMultiplierï¼š>1 æ›´å¿«ï¼ˆä¾‹å¦‚ 1.5 è¡¨ç¤ºå­å¼¹é€Ÿåº¦ *1.5ï¼‰
+    public void ApplyBulletBoost(float attackCooldownMultiplier, float bulletSpeedMultiplier, float duration)
+    {
+        if (boostRoutine != null) StopCoroutine(boostRoutine);
+        boostRoutine = StartCoroutine(BulletBoostCoroutine(attackCooldownMultiplier, bulletSpeedMultiplier, duration));
+        UpdateBoostUI();
+    }
+
+    private IEnumerator BulletBoostCoroutine(float attackCooldownMultiplier, float bulletSpeedMultiplier, float duration)
+    {
+        // å…ˆæ¢å¤åˆ°åˆå§‹å€¼ï¼Œé¿å…è¿ç»­æ‹¾å–è¶Šå è¶Šç¦»è°±
+        attackCooldown = baseAttackCooldown;
+        bulletSpeed = baseBulletSpeed;
+
+        // åº”ç”¨åŠ é€Ÿ
+        attackCooldown = Mathf.Max(0.05f, baseAttackCooldown * attackCooldownMultiplier);
+        bulletSpeed = Mathf.Max(0.1f, baseBulletSpeed * bulletSpeedMultiplier);
+
+        // å¼€å§‹å€’è®¡æ—¶æ˜¾ç¤º
+        boostRemaining = duration;
+
+        while (boostRemaining > 0f)
+        {
+            boostRemaining -= Time.deltaTime;
+            UpdateBoostUI();
+            yield return null;
+        }
+
+        // ç»“æŸï¼Œæ¢å¤æ•°å€¼å¹¶éšè—UI
+        attackCooldown = baseAttackCooldown;
+        bulletSpeed = baseBulletSpeed;
+
+        boostRemaining = 0f;
+        UpdateBoostUI();
+
+        boostRoutine = null;
+    }
+
+    private void UpdateBoostUI()
+    {
+        if (boostPanel != null)
+            boostPanel.SetActive(boostRemaining > 0f);
+
+        if (boostText != null)
+            boostText.text = $"Boost: {Mathf.Max(0f, boostRemaining):0.0}s";
+    }
+
+    private void PlayWinSfx2D()
+    {
+        if (winSfx == null) return;
+
+        GameObject go = new GameObject("WinSFX_2D");
+        AudioSource src = go.AddComponent<AudioSource>();
+
+        src.clip = winSfx;
+        src.volume = winVolume;
+        src.spatialBlend = 0f; // 0 = 2Dï¼Œä¸éšè·ç¦»è¡°å‡
+        src.playOnAwake = false;
+
+        src.Play();
+        Destroy(go, winSfx.length + 0.1f);
+    }
+    private void PlayLoseSfx2D()
+    {
+        if (loseSfx == null) return;
+
+        GameObject go = new GameObject("LoseSFX_2D");
+        AudioSource src = go.AddComponent<AudioSource>();
+
+        src.clip = loseSfx;
+        src.volume = loseVolume * 10f;
+        src.spatialBlend = 0f; // 2Dï¼Œä¸éšè·ç¦»è¡°å‡
+        src.playOnAwake = false;
+
+        src.Play();
+        Destroy(go, loseSfx.length + 0.1f);
+    }
+
 }

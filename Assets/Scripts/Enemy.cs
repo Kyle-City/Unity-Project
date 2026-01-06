@@ -11,13 +11,17 @@ public class Enemy : MonoBehaviour
     public float attackCooldown = 3f; // 攻击冷却时间
     public Slider enemySlider; // 敌人血条
     public Slider playerSilder; // 主角血条
-    public float damage = 0.1f; // 受到的伤害
+    public float damage = 0.25f; // 受到的伤害
 
     private Animator animator; // 动画控制器，用于控制敌人的动画
     private Transform target; // 主角的位置
     private float lastAttackTime = 0f; // 记录上次攻击的时间
     private NavMeshAgent agent; // 导航代理组件
     private float distanceToTarget; // 敌人与主角的距离
+
+    [Header("死亡音效（2D）")]
+    public AudioClip deathSfx;
+    public float deathVolume = 1f;
 
     void Start()
     {
@@ -60,7 +64,7 @@ public class Enemy : MonoBehaviour
         yield return new WaitForSeconds(0.5f); // 等待0.5秒以模拟攻击延迟
         if (distanceToTarget <= attackRange)
         {
-            playerSilder.value -= 0.1f; // 减少敌人的血量 
+            playerSilder.value -= 0.1f; // 减少玩家的血量 
         }   
     }
 
@@ -75,9 +79,24 @@ public class Enemy : MonoBehaviour
             // 如果敌人生命值小于等于0，销毁敌人对象
             if (enemySlider.value <= 0.01f)
             {
+                PlayDeathSfx2D();
                 Destroy(gameObject); // 销毁敌人
             }
         }
     }
+     private void PlayDeathSfx2D()
+    {
+        if (deathSfx == null) return;
+
+        GameObject go = new GameObject("EnemyDeathSFX_2D");
+        AudioSource src = go.AddComponent<AudioSource>();
+        src.clip = deathSfx;
+        src.volume = deathVolume * 2f;
+        src.spatialBlend = 0f; // 2D，不随距离衰减
+        src.playOnAwake = false;
+        src.Play();
+        Destroy(go, deathSfx.length + 0.1f);
+    }
+
 }
 
